@@ -97,7 +97,7 @@ class BetterIOPlugin(Star):
 
         # 拦截重复消息
         iconf = self.conf["intercept"]
-        if iconf["reread_block"] and msg in g.bot_msgs:
+        if tconf["block_reread"] and msg in g.bot_msgs:
             event.set_result(event.plain_result(""))
             logger.info(f"已阻止LLM发送重复消息：{msg}")
             return
