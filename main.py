@@ -50,7 +50,7 @@ class BetterIOPlugin(Star):
             r"\[at[:：]\s*(\d+)\]"  # [at:123]
             r"|\[at[:：]\s*([^\]]+)\]"  # [at:nickname]
             r"|@(\d{5,12})(?=\s|$)"  # @数字QQ
-            r"|@(\S+)",  # @昵称
+            r"|@([\w\u4e00-\u9fa5]+)",  # @昵称（仅匹配字母、数字、下划线、中文）
             re.IGNORECASE,  # **忽略大小写，At AT aT 全匹配**
         )
 
