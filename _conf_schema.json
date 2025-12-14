@@ -86,7 +86,7 @@
     "parse_at": {
         "description": "解析假艾特",
         "type": "bool",
-        "hint": "第四步：将消息中字符串式的假艾特转换成真艾特，包括：@username @id [at:username] [at:id] ,且忽略中英文和大小写",
+        "hint": "第四步：将消息中句首的假艾特转换成真艾特，包括：@username @id [at:username] [at:id] ,且忽略中英文和大小写",
         "default": true
     },
     "clean": {

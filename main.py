@@ -46,12 +46,14 @@ class BetterIOPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.conf = config
-        self.at_regex = re.compile(
+        self.at_head_regex = re.compile(
+            r"^\s*(?:"
             r"\[at[:：]\s*(\d+)\]"  # [at:123]
-            r"|\[at[:：]\s*([^\]]+)\]"  # [at:nickname]
-            r"|@(\d{5,12})(?=\s|$)"  # @数字QQ
-            r"|@([\u4e00-\u9fa5\w-]{2,20})",  # @昵称（2-20位，中文、字母、数字、下划线、短横线）
-            re.IGNORECASE,  # **忽略大小写，At AT aT 全匹配**
+            r"|\[at[:：]\s*([^\]]+)\]"  # [at:nick]
+            r"|@(\d{5,12})"  # @123456
+            r"|@([\u4e00-\u9fa5\w-]{2,20})"  # @昵称
+            r")\s*",
+            re.IGNORECASE,
         )
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
@@ -61,13 +63,14 @@ class BetterIOPlugin(Star):
         g: GroupState = StateManager.get_group(gid)
         g.last_mid = event.message_obj.message_id
 
-        # 缓存 “昵称 -> QQ”
-        cache_name_num = 100 # 缓存数量默认100
-        sender_id = event.get_sender_id()
-        sender_name = event.get_sender_name()
-        if len(g.name_to_qq) >= cache_name_num:
-            g.name_to_qq.popitem(last=False)  # FIFO 头删
-        g.name_to_qq[sender_name] = sender_id
+        # 缓存 “昵称 -> QQ”, 为解析假艾特提供映射
+        if self.conf["parse_at"]:
+            cache_name_num = 100 # 缓存数量默认100
+            sender_id = event.get_sender_id()
+            sender_name = event.get_sender_name()
+            if len(g.name_to_qq) >= cache_name_num:
+                g.name_to_qq.popitem(last=False)  # FIFO 头删
+            g.name_to_qq[sender_name] = sender_id
 
     @filter.on_decorating_result(priority=15)
     async def on_decorating_result(self, event: AstrMessageEvent):
@@ -173,39 +176,43 @@ class BetterIOPlugin(Star):
         self, chain: list[BaseMessageComponent], gstate: GroupState
     ) -> None:
         """
-        把字符串里的艾特语法原地换成真 At 组件。
+        解析“句首”的假艾特，并替换为真实 At 组件
+        - 只处理第一个 Plain
+        - 最多插入一个 At
         """
-        for seg in chain:
-            if not isinstance(seg, Plain):
-                continue
-            text = seg.text
-            if not text:
-                continue
 
-            # 从后往前匹配，避免 insert 导致偏移
-            matches = list(self.at_regex.finditer(text))
-            for m in reversed(matches):
-                qq = (
-                    m.group(1)  # [at:123]
-                    or gstate.name_to_qq.get(m.group(2))  # [at:nick]
-                    or m.group(3)  # @数字
-                    or gstate.name_to_qq.get(m.group(4))  # @nick
-                )
-                if not qq:
-                    continue  # 未命中缓存，保留原文
+        # 找到第一个有文本的 Plain
+        found = next(
+            (
+                (i, seg)
+                for i, seg in enumerate(chain)
+                if isinstance(seg, Plain) and seg.text
+            ),
+            None,
+        )
+        if not found:
+            return
 
-                # 拆段插入
-                head, tail = text[: m.start()], text[m.end() :]
-                seg.text = head
-                idx = chain.index(seg) + 1
-                chain.insert(idx, Plain("\u200b"))
-                chain.insert(idx + 1, At(qq=qq))
-                chain.insert(idx + 2, Plain("\u200b"))
-                if tail:
-                    chain.insert(idx + 3, Plain(tail))
-                # 更新引用，继续处理剩余尾巴
-                if tail:
-                    seg = chain[idx + 3]
-                    text = tail
-                else:
-                    break
+        idx, seg = found
+        text = seg.text
+
+        # 句首假艾特匹配
+        m = self.at_head_regex.match(text)
+        if not m:
+            return
+
+        qq = (
+            m.group(1)  # [at:123]
+            or gstate.name_to_qq.get(m.group(2))  # [at:nick]
+            or m.group(3)  # @数字QQ
+            or gstate.name_to_qq.get(m.group(4))  # @昵称
+        )
+        if not qq:
+            return
+
+        # 剪掉假艾特文本
+        seg.text = text[m.end() :]
+
+        # 在 Plain 前插入真实 At
+        chain.insert(idx, At(qq=qq))
+        chain.insert(idx + 1, Plain("\u200b"))  # 防止 At 与文本粘连
