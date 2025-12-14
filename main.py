@@ -91,16 +91,19 @@ class BetterIOPlugin(Star):
         gid: str = event.get_group_id()
         g: GroupState = StateManager.get_group(gid)
 
-        # 拦截错误信息(管理员触发的则不拦截)
+        # 拦截错误信息
         econf = self.conf["error"]
         emode = econf["mode"]
         if emode != "ignore":
             for word in econf["keywords"]:
                 if word in msg:
-                    if emode == "forward" and self.admin_id:
-                        event.message_obj.group_id = ""
-                        event.message_obj.sender.user_id = self.admin_id
-                        logger.debug(f"已将消息发送目标改为管理员（{self.admin_id}）私聊")
+                    if emode == "forward":
+                        if self.admin_id:
+                            event.message_obj.group_id = ""
+                            event.message_obj.sender.user_id = self.admin_id
+                            logger.debug(f"已将消息发送目标改为管理员（{self.admin_id}）私聊")
+                        else:
+                            logger.warning("未配置管理员ID，无法转发错误信息")
                     elif emode == "block":
                         event.set_result(event.plain_result(""))
                         logger.info(f"已阻止发送报错提示：{msg}")
