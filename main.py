@@ -46,6 +46,10 @@ class BetterIOPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.conf = config
+        # bot管理员(仅取第一位)
+        admins_id: str | None = context.get_config().get("admins_id", [])
+        self.admin_id = admins_id[0] if admins_id else None
+        # 假艾特正则
         self.at_head_regex = re.compile(
             r"^\s*(?:"
             r"\[at[:：]\s*(\d+)\]"  # [at:123]
@@ -89,12 +93,18 @@ class BetterIOPlugin(Star):
 
         # 拦截错误信息(管理员触发的则不拦截)
         econf = self.conf["error"]
-        if econf["block_error"] and not event.is_admin():
+        emode = econf["mode"]
+        if emode != "ignore":
             for word in econf["keywords"]:
                 if word in msg:
-                    event.set_result(event.plain_result(""))
-                    logger.info(f"已阻止发送报错提示：{msg}")
-                    return
+                    if emode == "forward" and self.admin_id:
+                        event.message_obj.group_id = ""
+                        event.message_obj.sender.user_id = self.admin_id
+                        logger.debug(f"已将消息发送目标改为管理员（{self.admin_id}）私聊")
+                    elif emode == "block":
+                        event.set_result(event.plain_result(""))
+                        logger.info(f"已阻止发送报错提示：{msg}")
+                        return
 
         # 仅处理LLM消息
         if self.conf["only_llm_result"] and not result.is_llm_result():
