@@ -44,12 +44,13 @@ class Recaller:
 
     def _is_recall(self, chain: list[BaseMessageComponent]) -> bool:
         """判断消息是否需撤回"""
+        max_plain_len = self.conf["recall"]["max_plain_len"]
         for seg in chain:
             if isinstance(seg, Plain):
                 # 判断长文本
-                if self.conf["max_plain_len"] < len(seg.text):
+                if len(seg.text) > max_plain_len:
                     logger.debug(
-                        f"文本长度：{len(seg.text)} > {self.conf['max_plain_len']}， 需要撤回"
+                        f"文本长度：{len(seg.text)} > {max_plain_len}， 需要撤回"
                     )
                     return True
                 # 判断关键词
@@ -58,7 +59,7 @@ class Recaller:
                         return True
             elif isinstance(seg, Image):
                 # TODO: 判断色图
-                return False
+                continue
         return False
 
     async def _recall_msg(self, client: CQHttp, message_id: int = 1):
@@ -107,7 +108,6 @@ class Recaller:
         if (
             send_result
             and (message_id := send_result.get("message_id"))
-            and self._is_recall(chain)
         ):
             task = asyncio.create_task(self._recall_msg(client, int(message_id)))  # type: ignore
             task.add_done_callback(self._remove_task)

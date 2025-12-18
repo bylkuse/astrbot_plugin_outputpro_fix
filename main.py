@@ -67,8 +67,6 @@ class BetterIOPlugin(Star):
             r")\s*",
             re.IGNORECASE,
         )
-        # 消息撤回任务
-        self.recall_tasks: list[asyncio.Task] = []
 
     # ================= 生命周期 ================
     async def initialize(self):
