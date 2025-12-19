@@ -1,4 +1,3 @@
-
 import random
 import re
 from collections import OrderedDict, deque
@@ -131,6 +130,9 @@ class BetterIOPlugin(Star):
 
         # 剪掉假艾特文本
         seg.text = text[m.end() :]
+        if not seg.text:
+            chain.pop(idx)
+            return
 
         # 在 Plain 前插入真实 At
         chain.insert(idx, At(qq=qq))
@@ -158,9 +160,9 @@ class BetterIOPlugin(Star):
             obmsg[0]["data"]["summary"] = random.choice(self.conf["summary"]["quotes"])
             raw = event.message_obj.raw_message
             await event.bot.send(raw, obmsg)  # type: ignore
+            event.should_call_llm(True)
             chain.clear()
             return
-
 
         msg = result.get_plain_text()
 
@@ -241,9 +243,7 @@ class BetterIOPlugin(Star):
                 if cconf["punctuation"]:
                     seg.text = re.sub(cconf["punctuation"], "", seg.text)
 
-
         if isinstance(event, AiocqhttpMessageEvent):
-
             # 智能艾特
             if self.conf["at_prob"]:
                 has_at = any(isinstance(c, At) for c in chain)
@@ -268,5 +268,3 @@ class BetterIOPlugin(Star):
             # 智能撤回
             if self.conf["recall"]["enable"]:
                 await self.recaller.send_and_recall(event)
-
-

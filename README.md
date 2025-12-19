@@ -20,16 +20,7 @@ _✨ [astrbot](https://github.com/AstrBotDevs/AstrBot) 输出增强插件 ✨_
 
 ## 📦 安装
 
-- 可以直接在astrbot的插件市场搜索astrbot_plugin_outputpro，点击安装，耐心等待安装完成即可
-- 若是安装失败，可以尝试直接克隆源码：
-
-```bash
-# 克隆仓库到插件目录
-cd /AstrBot/data/plugins
-git clone https://github.com/Zhalslar/astrbot_plugin_outputpro
-
-# 控制台重启AstrBot
-```
+在astrbot的插件市场搜索astrbot_plugin_outputpro，点击安装即可
 
 ## ⌨️ 使用说明
 

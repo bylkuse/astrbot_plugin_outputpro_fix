@@ -91,6 +91,7 @@ class Recaller:
         if not self._is_recall(chain):
             return
 
+        event.should_call_llm(True)
         obmsg = await event._parse_onebot_json(MessageChain(chain=chain))
         client = event.bot
 
