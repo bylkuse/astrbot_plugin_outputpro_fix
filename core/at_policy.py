@@ -17,28 +17,36 @@ from .state import GroupState
 class AtPolicy:
     def __init__(self, config: dict):
         self.conf = config
-        # 假艾特正则
+
         self.at_head_regex = re.compile(
             r"^\s*(?:"
-            r"\[at[:：]\s*(\d+)\]"  # [at:123]
-            r"|\[at[:：]\s*([^\]]+)\]"  # [at:nick]
-            r"|@(\d{5,12})"  # @123456
-            r"|@([\u4e00-\u9fa5\w-]{2,20})"  # @昵称
+            r"\[at[:：]\s*(\d+)\]"
+            r"|\[at[:：]\s*([^\]]+)\]"
+            r"|@(\d{5,12})"
+            r"|@([\u4e00-\u9fa5\w-]{2,20})"
             r")\s*",
             re.IGNORECASE,
         )
 
-    def parse_fake_at(
-        self,
-        chain: list[BaseMessageComponent],
-        gstate: GroupState,
-    ) -> tuple[int | None, str | None, str | None]:
+    # -------------------------
+    # 基础判断
+    # -------------------------
+    def _has_at(self, chain: list[BaseMessageComponent]) -> bool:
+        for seg in chain:
+            if isinstance(seg, At):
+                return True
+            if isinstance(seg, Plain) and self.at_head_regex.match(seg.text):
+                return True
+        return False
+
+    # -------------------------
+    # 假 at 解析（只读）
+    # -------------------------
+    def _parse_fake_at(self, chain, gstate):
         """
-        解析假 At（纯函数）
-        返回:
-            index, qq, nickname
+        只识别，不修改
         """
-        for i, seg in enumerate(chain):
+        for idx, seg in enumerate(chain):
             if not isinstance(seg, Plain) or not seg.text:
                 continue
 
@@ -52,18 +60,14 @@ class AtPolicy:
             if not qq and nickname:
                 qq = gstate.name_to_qq.get(nickname)
 
-            return i, qq, nickname
+            return idx, qq, nickname
 
         return None, None, None
 
-    def apply_at(
-        self,
-        chain: list[BaseMessageComponent],
-        idx: int | None,
-        qq: str | None,
-        nickname: str | None,
-    ):
-        """应用 At（唯一修改点）"""
+    # -------------------------
+    # 应用假 at（真正修改）
+    # -------------------------
+    def _apply_fake_at(self, chain, idx, qq, nickname):
         if idx is None:
             return
 
@@ -71,7 +75,7 @@ class AtPolicy:
         if not isinstance(seg, Plain):
             return
 
-        # 移除假 at 前缀
+        # 删除假 at 前缀
         seg.text = self.at_head_regex.sub("", seg.text, count=1)
 
         if not seg.text:
@@ -88,7 +92,7 @@ class AtPolicy:
             chain.insert(idx + 1, Plain("\u200b"))
 
     # -------------------------
-    # 统一入口
+    # 主入口
     # -------------------------
     def handle(
         self,
@@ -96,40 +100,32 @@ class AtPolicy:
         chain: list[BaseMessageComponent],
         gstate: GroupState,
     ):
-        """统一入口"""
-        # 解析假艾特
-        idx, qq, nickname = self.parse_fake_at(chain, gstate)
+        # ===== 1. 假艾特解析 =====
+        idx, qq, nickname = self._parse_fake_at(chain, gstate)
+        self._apply_fake_at(chain, idx, qq, nickname)
 
-        # 应用 At
-        self.apply_at(chain, idx, qq, nickname)
-
-        # 概率艾特
+        # ===== 2. 智能艾特 =====
         if not (
-            all(isinstance(c, Plain | Image | Face | At | Reply) for c in chain)
-            and self.conf["at_prob"] > 0
+            self.conf["at_prob"] > 0
+            and all(isinstance(c, Plain | Image | Face | At | Reply) for c in chain)
         ):
             return
 
-        has_at = any(
-            isinstance(c, At)
-            or (isinstance(c, Plain) and c.text.lstrip().startswith("@"))
-            for c in chain
-        )
-
+        has_at = self._has_at(chain)
         hit = random.random() < self.conf["at_prob"]
 
-        # 命中 → 必须有 @
+        # 命中 → 必须有 at
         if hit and not has_at and chain and isinstance(chain[0], Plain):
             chain.insert(0, At(qq=event.get_sender_id()))
 
-        # 未命中 → 清空所有 @
+        # 未命中 → 清除所有 at
         elif not hit and has_at:
             new_chain = []
             for c in chain:
                 if isinstance(c, At):
                     continue
                 if isinstance(c, Plain):
-                    c.text = re.sub(r"^\s*@[\u4e00-\u9fa5\w-]+\s*", "", c.text)
+                    c.text = self.at_head_regex.sub("", c.text, count=1)
                     if not c.text:
                         continue
                 new_chain.append(c)
