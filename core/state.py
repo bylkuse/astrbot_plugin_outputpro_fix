@@ -9,7 +9,7 @@ class GroupState(BaseModel):
     bot_msgs: deque = Field(default_factory=lambda: deque(maxlen=5))
     """Bot消息缓存"""
     msg_queue: deque[str] = Field(default_factory=lambda: deque(maxlen=10))
-    """最近消息 ID 队列，用于智能回复决策"""
+    """用户消息缓存"""
     name_to_qq: OrderedDict[str, str] = Field(default_factory=lambda: OrderedDict())
     """昵称 -> QQ"""
 

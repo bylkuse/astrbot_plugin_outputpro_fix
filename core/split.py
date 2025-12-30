@@ -63,7 +63,7 @@ class MessageSplitter:
         sconf = config["split"]
 
         # 用于 Plain 文本分割
-        self.split_pattern = f"[{re.escape(sconf['chars'])}]+"
+        self.split_pattern = self._build_split_pattern(sconf["char_list"])
 
         # 最大分段数（<=0 表示不限制）
         self.max_count = sconf["max_count"]
@@ -80,7 +80,24 @@ class MessageSplitter:
         # 最大文本长度归一化，用于映射到 min/max
         self._max_len_for_delay = 150
 
-    def calc_delay(self, text_len: int) -> float:
+    def _build_split_pattern(self, char_list: list[str]) -> str:
+        """
+        char_list 来自前端配置，例如：
+        ["。", "？", "\\s", "\\n"]
+        """
+        tokens = []
+
+        for ch in char_list:
+            if ch == "\\n":
+                tokens.append("\n")
+            elif ch == "\\s":
+                tokens.append(r"\s")
+            else:
+                tokens.append(re.escape(ch))
+
+        return f"[{''.join(tokens)}]+"
+
+    def _calc_delay(self, text_len: int) -> float:
         """
         根据文本长度计算延迟（线性映射到 min_delay ~ max_delay）：
         - 短文本 → 接近 min_delay
@@ -118,7 +135,7 @@ class MessageSplitter:
                     umo,
                     MessageChain(seg.components),
                 )
-                delay = self.calc_delay(len(seg.text))
+                delay = self._calc_delay(len(seg.text))
                 await asyncio.sleep(delay)
             except Exception as e:
                 logger.error(f"[Splitter] 发送分段 {i + 1} 失败: {e}")
