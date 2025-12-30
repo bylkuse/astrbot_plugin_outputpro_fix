@@ -42,17 +42,6 @@ class Segment:
         """是否为空段（无文本、无媒体）"""
         return not self.text.strip() and not self.has_media
 
-    def strip_tail_punctuation(self):
-        """
-        移除末尾 Plain 文本中的句尾符号
-        只处理最后一个 Plain，不影响中间结构
-        """
-        for comp in reversed(self.components):
-            if isinstance(comp, Plain):
-                # 去掉末尾标点（中英文）
-                comp.text = re.sub(r"[,，。.、；;：:]+$", "", comp.text)
-                break
-
 
 class MessageSplitter:
     """
@@ -80,6 +69,10 @@ class MessageSplitter:
         # 最大文本长度归一化，用于映射到 min/max
         self._max_len_for_delay = 150
 
+        # 末尾标点清除正则
+        tail_punc = ".,，。、;；:："
+        self.tail_punc_re = re.compile(f"[{re.escape(tail_punc)}]+$")
+
     def _build_split_pattern(self, char_list: list[str]) -> str:
         """
         char_list 来自前端配置，例如：
@@ -96,6 +89,13 @@ class MessageSplitter:
                 tokens.append(re.escape(ch))
 
         return f"[{''.join(tokens)}]+"
+
+    def _strip_last_plain(self, seg: Segment):
+        """清掉 Segment 中语义最后一个非空 Plain 的句尾标点"""
+        for comp in reversed(seg.components):
+            if isinstance(comp, Plain) and comp.text.strip():
+                comp.text = self.tail_punc_re.sub("", comp.text)
+                break
 
     def _calc_delay(self, text_len: int) -> float:
         """
@@ -252,6 +252,6 @@ class MessageSplitter:
             push(current)
 
         for seg in segments:
-            seg.strip_tail_punctuation()
+            self._strip_last_plain(seg)
 
         return segments
