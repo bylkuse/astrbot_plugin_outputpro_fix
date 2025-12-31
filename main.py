@@ -377,9 +377,8 @@ class OutputPlugin(Star):
 
         nodes = Nodes([])
         name = await self._ensure_node_name(ctx.event)
-        uid = ctx.event.get_self_id()
         content = list(ctx.chain.copy())
-        nodes.nodes.append(Node(uin=uid, name=name, content=content))
+        nodes.nodes.append(Node(uin=ctx.bid, name=name, content=content))
         ctx.chain[:] = [nodes]
         return None
 
