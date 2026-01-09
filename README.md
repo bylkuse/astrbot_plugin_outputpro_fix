@@ -1,4 +1,4 @@
-
+# 修复：OneBot 端响应超时导致渲染的图片被重复发送的问题
 <div align="center">
 
 ![:name](https://count.getloli.com/@astrbot_plugin_outputpro?name=astrbot_plugin_outputpro&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)

@@ -214,7 +214,12 @@ class OutputPlugin(Star):
         obmsg = await ctx.event._parse_onebot_json(MessageChain(ctx.chain))
         obmsg[0]["data"]["summary"] = random.choice(self.conf["summary"]["quotes"])
 
-        await ctx.event.bot.send(ctx.event.message_obj.raw_message, obmsg)  # type: ignore
+        try:
+            await ctx.event.bot.send(ctx.event.message_obj.raw_message, obmsg)  # type: ignore
+        except Exception as e:
+            # 捕获发送异常（例如超时 ActionFailed），避免异常冒泡导致 AstrBot 核心重发消息
+            logger.warning(f"[OutputPro] Summary image send warning (possible timeout): {e}")
+
         ctx.event.should_call_llm(True)
         ctx.chain.clear()
 
